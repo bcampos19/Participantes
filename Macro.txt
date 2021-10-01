@@ -1,0 +1,102 @@
+Sub transferirDatosOtraHoja()
+   ' Creado por: Benjamin Campos
+   ' Análisis de Datos
+   ' Fecha: 29-Septiembre-2021 - En medio de la pandemia del Covid-19
+   ' Los datos se pueden validar con PS>: Invoke-RestMethod -Method Get -Uri "http://ip-api.com/json/186.188.228.2"
+
+   ' Campos repetidos de la nueva hoja
+    Dim HojaExiste As Worksheet
+    Dim HojaNueva As String
+    Dim HojaProblema  As String
+    Dim http As Object
+    Dim xmlDoc As MSXML2.DOMDocument60
+    Dim strURL As String
+
+    ' Campos de empleados de la nueva hoja
+    Dim Nombre As String
+    Dim GDPR_IP As String
+    Dim Ciudad As String
+    Dim Pais As String
+
+    
+    
+    ' Variables de Manejo de la macro
+    Dim Cont, ultimaFila, ultimaFila2 As Long
+    Dim Fila As Long
+    Dim IniciarTiempo As Double
+    
+    On Error Resume Next
+    
+    HojaNueva = "Solucion"
+    HojaProblema = "Prueba de capacidades técnicas"
+       
+    Set HojaExiste = Sheets(HojaNueva)
+    
+    If Not HojaExiste Is Nothing Then
+        MsgBox "Exite creada la hoja " & HojaNueva & Chr(13) & _
+               "Se procederá a eliminar la hoja y se reemplazará", vbInformation, "Verificación"
+        Application.DisplayAlerts = False
+        Sheets(HojaNueva).Delete
+        Application.DisplayAlerts = True
+    Else
+        MsgBox "Se creará la hoja " & HojaNueva & " con los resultados", vbInformation, "Creación de hoja"
+    End If
+    
+    Application.ScreenUpdating = False
+    IniciarTiempo = Timer
+    
+    'Creamos los encabezados en la nueva hoja con la solucion
+    Worksheets.Add(After:=Worksheets(Worksheets.Count)).Name = HojaNueva
+    Sheets(HojaNueva).Cells(1, 1) = "Nombre"
+    Sheets(HojaNueva).Cells(1, 2) = "GDPR_IP"
+    Sheets(HojaNueva).Cells(1, 3) = "Ciudad"
+    Sheets(HojaNueva).Cells(1, 4) = "Pais"
+
+    ultimaFila = Sheets(HojaProblema).Range("B" & Rows.Count).End(xlUp).Row
+    
+    'Recorremos el listado dado con las IP de los participantes
+    For Cont = 1 To ultimaFila - 1
+        
+            Nombre = CStr(Sheets(HojaProblema).Cells(Cont + 1, 1))
+            GDPR_IP = Sheets(HojaProblema).Cells(Cont + 1, 2)
+            
+            ultimaFila2 = Sheets(HojaNueva).Range("A" & Rows.Count).End(xlUp).Row
+            Sheets(HojaNueva).Cells(ultimaFila2 + 1, 1) = Nombre
+            Sheets(HojaNueva).Cells(ultimaFila2 + 1, 2) = GDPR_IP
+            
+            'Utilizamos el servicio Web de https://ipapi.co que vuelca la consulta de una IP
+            'a un paquete XML que podemos leer, tambien puede ser http://ip-api.com/xml/
+            
+            'strURL = "https://ipapi.co/" & GDPR_IP & "/xml/"
+            
+            strURL = "http://ip-api.com/xml/" & GDPR_IP
+            Set http = CreateObject("MSXML2.XMLHTTP")
+                
+            http.Open "get", strURL, False
+            http.send
+            Set xmlDoc = New MSXML2.DOMDocument60
+            
+            xmlDoc.LoadXML http.responseText
+            
+            Debug.Print http.responseText
+            
+            IPcity = xmlDoc.SelectSingleNode("//city").Text
+            IPcountry = xmlDoc.SelectSingleNode("//country").Text
+            
+            'Colocamos en la hoja los datos leidos en el XML
+            Sheets(HojaNueva).Cells(ultimaFila2 + 1, 3) = IPcity
+            Sheets(HojaNueva).Cells(ultimaFila2 + 1, 4) = IPcountry
+            
+    Next Cont
+    
+    'Le da formato tabla a los datos resultantes
+    Sheets(HojaNueva).Range("A1").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    Cells.EntireColumn.AutoFit
+   
+    Application.ScreenUpdating = True
+    MsgBox "Se analizaron " & ultimaFila & " registros en " & Format(Timer - IniciarTiempo, "#0.00") & " segundos " & Chr(13) & _
+           "que resultaron en " & ultimaFila2 & " registros de IPs.", vbInformation, "Resultado"
+End Sub
